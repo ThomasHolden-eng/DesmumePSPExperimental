@@ -300,13 +300,13 @@ class register_manager
       }
 
 
-      void flush_all()
+      void flush_all(bool keep_dirty = false)
       {
          for (int i = psp_s0; i < psp_s4; i ++)
          {
             //if (is_usable(i))
             {
-               flush((psp_gpr_t)i);
+               flush((psp_gpr_t)i, keep_dirty);
             }
          }
       }

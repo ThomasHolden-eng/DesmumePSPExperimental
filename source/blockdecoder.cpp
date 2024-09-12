@@ -524,8 +524,8 @@ void emitARMOP(opcode& op){
         case OP_ADD:
         {
 
-            if (op.preOpType == PRE_OP_LSL_IMM)
-                printf("0x%x\nr1: %d, r2: %d, r3: %d\n", emit_getCurrAdr(), op.rd, op.rs1, op.rs2);
+            /*if (op.preOpType == PRE_OP_LSL_IMM)
+                printf("0x%x\nr1: %d, r2: %d, r3: %d\n", emit_getCurrAdr(), op.rd, op.rs1, op.rs2);*/
 
             if (op.preOpType == PRE_OP_IMM){
                 arm_add<true, false>(op);
@@ -667,6 +667,8 @@ void emitARMOP(opcode& op){
         {
             int32_t regs[2] = { op.condition != -1 ? op.rd : op.rd | 0x10, op.rs2};
 
+
+
             if (op.preOpType == PRE_OP_IMM){
                 regman.get(1, regs);
                 const psp_gpr_t dst = (op.condition != -1) ? psp_at : (psp_gpr_t)regs[0]; 
@@ -677,8 +679,6 @@ void emitARMOP(opcode& op){
                         else if (op.imm == 0 && op.condition == -1) emit_move(dst, psp_zero);
                     }
                 );
-
-                END_OP_CHKR15(regs[0])
             }else{ 
                 regman.get(2, regs);
                 const psp_gpr_t dst = (op.condition != -1) ? psp_at : (psp_gpr_t)regs[0];
@@ -692,8 +692,8 @@ void emitARMOP(opcode& op){
                     }
                 );
 
-                END_OP_CHKR15(regs[0])
             }
+            END_OP_CHKR15(regs[0])
             break;
         }
 
@@ -727,7 +727,7 @@ void emitARMOP(opcode& op){
         {
             int32_t regs[2] = { op.rd, op.rs1};
 
-            regman.flush_all();  
+            regman.flush_all(true);   
 
             conditional(
                 regman.get(2, regs);
@@ -766,11 +766,11 @@ void emitARMOP(opcode& op){
                     
                     emit_addiu(regs[0], regs[0], op.imm);
                     
-                    /*if (op.condition == -1) {
-                        regman.map(op.rd, (psp_gpr_t)regs[0]);
-                        regman.mark_dirty((psp_gpr_t)regs[0]);
+                    if (op.condition == -1) {
+                        regman.map(op.rd, (psp_gpr_t)regs[1]);
                     }
-                    else*/                    storeReg((psp_gpr_t)regs[0], op.rd);
+                    
+                    storeReg((psp_gpr_t)regs[0], op.rd);
                     
                     //printf("Mapped %d to %d 0x%x\n", op.rd, regs[0], (u32)emit_getCurrAdr());
                 }
@@ -789,7 +789,7 @@ void emitARMOP(opcode& op){
         {
             int32_t regs[2] = {op.rd | 0x10, op.rs1};
 
-            regman.flush_all(); 
+            regman.flush_all(true); 
 
             //printf("0x%x\n", (u32)emit_getCurrAdr()); 
 
@@ -833,11 +833,11 @@ void emitARMOP(opcode& op){
                 
                 regman.reset(); 
 
-                /*if (op.condition == -1) {
+                if (op.condition == -1) {
                     regman.map(op.rd, (psp_gpr_t)regs[0]);
                     regman.mark_dirty((psp_gpr_t)regs[0]);
                 }
-                else*/                    
+                else                    
                     storeReg((psp_gpr_t)regs[0], op.rd);
             )
             
