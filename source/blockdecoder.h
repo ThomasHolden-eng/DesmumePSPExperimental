@@ -49,15 +49,25 @@ static uint32_t block_procnum;
 #define _flag_V8 4
 
 #define conditional(x) \
-    if (op.condition != -1 && !(op.extra_flags&EXTFL_MERGECOND)) {\
-            conditional_label = emit_Halfbranch(op.condition);\
+    if (op.condition != -1) {\
+            conditional_label = emit_Halfbranch(op.condition, op.check_condition);\
             jump_sz = emit_getCurrAdr();\
         }\
         {x;}\        
-        if (conditional_label != 0 && op.condition != -1 && (op.extra_flags&EXTFL_SAVECOND)){\
+        if (conditional_label != 0 && op.condition != -1){\
             jump_sz = emit_getCurrAdr() - jump_sz;\
             CompleteCondition(op.condition, conditional_label, emit_getCurrAdr() + jump_sz + 8);\
         }
+
+#define conditional_branchless(dst, tmp_dst, x) \
+    if (op.condition != -1 && op.check_condition) generate_condition_check(op.condition);\
+    /*else if (!op.check_condition) printf("No condition 0x%x\n", emit_getCurrAdr());*/\
+    {x;} \
+    if (op.condition != -1){\
+        const bool isMovz = (op.condition < 8) ? (op.condition & 1) : !(op.condition & 1);\
+        if (isMovz) emit_movz(dst, tmp_dst, psp_s4); \
+        else emit_movn(dst, tmp_dst, psp_s4); \
+    }
 
 enum op{
     
@@ -78,6 +88,9 @@ enum op{
     OP_ADD,
     OP_SUB,
     OP_MUL,
+    OP_UMUL,
+    OP_MLA,
+    OP_UMLA,
     OP_CLZ,
     OP_RSB,
     OP_NEG,
@@ -89,8 +102,6 @@ enum op{
     OP_LDRH,
     OP_STRH,
     OP_STMIA,
-
-    OP_MLA,
 
     OP_LSR_0,
 
@@ -108,11 +119,14 @@ enum op{
 
 enum opType{
     PRE_OP_LSL_IMM,
-    PRE_OP_LSL_REG,
     PRE_OP_LSR_IMM,
-    PRE_OP_LSR_REG,
     PRE_OP_ASR_IMM,
+    PRE_OP_ROR_IMM,
+
+    PRE_OP_LSL_REG,
+    PRE_OP_LSR_REG,
     PRE_OP_ASR_REG,
+    PRE_OP_ROR_REG,
 
     PRE_OP_REG_OFF,
     PRE_OP_M_REG_OFF,
@@ -149,15 +163,17 @@ struct opcode{
     uint32_t rd;
     uint32_t rs1;
     uint32_t rs2;
-    int32_t imm;
+    uint32_t imm;
     uint32_t op_pc;
     uint32_t condition;
     uint32_t extra_flags;
 
+    bool check_condition = true;
+
     op _op;
     opType preOpType;
 
-    opcode(op opcode, uint32_t rd, uint32_t rs1, uint32_t rs2, int32_t imm, opType preOpType, uint32_t pc, uint32_t condition, uint32_t extra_flags = EXTFL_NONE){
+    opcode(op opcode, uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t imm, opType preOpType, uint32_t pc, uint32_t condition, uint32_t extra_flags = EXTFL_NONE){
         this->_op = opcode;
         this->rd = rd;
         this->rs1 = rs1;
@@ -178,7 +194,7 @@ class block{
             printf("block created\n");
         }
 
-        void addOP(op _op, uint32_t pc, uint32 rd = -1, uint32 rs1 = -1, uint32 rs2 = -1, int32_t imm = -1, opType preOpType = PRE_OP_NONE, uint32_t condition = -1, uint32_t extra_flags = EXTFL_SAVECOND){
+        void addOP(op _op, uint32_t pc, uint32 rd = -1, uint32 rs1 = -1, uint32 rs2 = -1, uint32_t imm = -1, opType preOpType = PRE_OP_NONE, uint32_t condition = -1, uint32_t extra_flags = EXTFL_SAVECOND){
             
             if ((_op >= OP_CMP && _op != OP_SWI) || condition != -1) uses_flags = true;
 

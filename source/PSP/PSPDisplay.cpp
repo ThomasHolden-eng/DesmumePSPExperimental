@@ -176,7 +176,7 @@ void drawmenu() {
 			if (curr_posX == romX) intraFontPrintf(Font, 20, 240, "ROM: %s::%s", menu[romX].GetIconName(), menu[romX].GetFileName());
 		}
 
-	intraFontPrint(Font, 210, 15, "Pre Release V2");
+	intraFontPrint(Font, 210, 15, "Pre Release V3");
 	intraFontPrintf(Font, 390, 15, "Battery:%d%%", scePowerGetBatteryLifePercent());
 
 	sceGuFinish();
@@ -186,10 +186,9 @@ void drawmenu() {
 const float sw = 511;
 static const int scale = (int)(sw * (float)SLICE_SIZE) / (float)512;
 struct DispVertex* screen_gpuvtx;
+int n_slices = 0;
 
-void DrawSliced(int dx){
-
-
+void SetupDisplay(int dx){
     for (int start = 0, end = sw, idx = 0; start < end; start += SLICE_SIZE, dx += scale) {
 		int width = (start + SLICE_SIZE) < end ? SLICE_SIZE : end - start;
 
@@ -205,7 +204,7 @@ void DrawSliced(int dx){
 		screen_gpuvtx[idx].y = 192 + 40;
 		screen_gpuvtx[idx++].z = 0;
 
-		sceGuDrawArray(GU_SPRITES, TEXTURE_FLAGS, 2, NULL, &screen_gpuvtx[idx-2]);
+		n_slices++;
   }
 }
 
@@ -227,27 +226,27 @@ void DrawSprite(){
 
 }
 
-void EMU_SCREEN() {
+void EMU_SCREEN(bool skip2d, bool skip3d) {
 	/*switch (type){
 
 	}
 	static const int sz_SCR = 256 * 192 * 4;
 	sceDmacMemcpy(DISP_POINTER, (const void*)&GPU_Screen, sz_SCR);*/
+
+	if (skip2d && skip3d) return;
 	
 	sceGuSync(0, 0);
 	sceGuStart(GU_DIRECT, gulist);
 
-	sceGuDrawBuffer(GU_PSM_5551, 0, GU_VRAM_WIDTH);
-
+	if (!skip2d) {
+		sceGuDrawBuffer(GU_PSM_5551, 0, GU_VRAM_WIDTH);
+		sceGuEnable(GU_TEXTURE_2D);
+		sceGuTexMode(GU_PSM_5551, 0, 0, 0);
+		sceGuTexFunc(GU_TFX_REPLACE, GU_TCC_RGB);
+		sceGuTexImage(0, 512, 256, 512, (const void*)&GPU_Screen[0]);
+		sceGuDrawArray(GU_SPRITES, TEXTURE_FLAGS, n_slices * 2, NULL, &screen_gpuvtx[0]);
+	}
 	
-	sceGuEnable(GU_TEXTURE_2D);
-
-	sceGuTexMode(GU_PSM_5551, 0, 0, 0);
-	sceGuTexFunc(GU_TFX_REPLACE, GU_TCC_RGB);
-    sceGuTexImage(0, 512, 256, 512, (const void*)&GPU_Screen[0]);
-
-	DrawSliced(0);
-
 	gpu3D->NDS_3D_Render();
 
 	sceGuFinish();
@@ -325,6 +324,8 @@ void Init_PSP_DISPLAY_FRAMEBUFF() {
 	Font = intraFontLoad(font, INTRAFONT_CACHE_ASCII);
 	intraFontActivate(Font);
 	intraFontSetStyle(Font, 0.6f, 0xFFFFFFFF, 0, 0, 0);
+
+	SetupDisplay(0);
 
 }
 

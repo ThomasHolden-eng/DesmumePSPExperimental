@@ -291,9 +291,6 @@ void Menu(){
 				}
 				 if (pad.Buttons & PSP_CTRL_CIRCLE){
 					 pspDebugScreenClear();
-
-					 if (my_config.frameskip == 0)
-						 my_config.frameskip++; //Add one more Frameskip if it's set to 0. We need at least one to process input.
 					return;
 	  			}
 			}

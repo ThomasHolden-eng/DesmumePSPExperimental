@@ -257,10 +257,10 @@ void DoConfig(configured_features * params)
 #ifdef LOWRAM
 	configparms[5].var = 1;
 	configparms[6].var = 1;
-#else.
+#else
 	configparms[1].var = 1;
 	configparms[2].var = 1;
-	configparms[4].var = 2;
+	configparms[4].var = 1;
 	configparms[6].var = 1;
 	configparms[8].var = 1;
 
@@ -296,10 +296,9 @@ void DoConfig(configured_features * params)
 						if (langposconfig == -1)langposconfig = 0;
 					}
 					else
-						if (strcmp(configparms[selposconfig].name, "3D Frameskip") == 0)
+						if (strcmp(configparms[selposconfig].name, "Frameskip") == 0)
 						{
-							configparms[selposconfig].var = frameposconfig--;
-							if (frameposconfig == -1)frameposconfig = 0;
+							configparms[selposconfig].var = frameposconfig-- % 10;
 						}
 						else
 						{
@@ -314,10 +313,9 @@ void DoConfig(configured_features * params)
 							if (langposconfig == 8)langposconfig = 7;
 						}
 						else
-							if (strcmp(configparms[selposconfig].name, "3D Frameskip") == 0)
+							if (strcmp(configparms[selposconfig].name, "Frameskip") == 0)
 							{
-								configparms[selposconfig].var = frameposconfig++;
-								if (frameposconfig == 10)frameposconfig = 9;
+								configparms[selposconfig].var = frameposconfig++ % 10;
 							}
 							else
 							{
@@ -336,12 +334,10 @@ void DoConfig(configured_features * params)
 				}*/
 				
 				if (pad.Buttons & PSP_CTRL_UP) {
-					selposconfig--;
-					if (selposconfig < 0)selposconfig = 0;
+					selposconfig = ((unsigned int)(selposconfig - 1)) % totalconfig;
 				}
 				if (pad.Buttons & PSP_CTRL_DOWN) {
-					selposconfig++;
-					if (selposconfig >= totalconfig - 1)selposconfig = totalconfig - 1;
+					selposconfig = ((unsigned int)(selposconfig + 1)) % totalconfig;
 				}
 
 			}

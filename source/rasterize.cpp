@@ -269,7 +269,7 @@ public:
 
 		const size_t polyCount = engine->polylist->count; //engine->clippedPolyCounter;
 
-		static const int GUPrimitiveType[] = { GU_TRIANGLE_FAN , GU_TRIANGLE_FAN, GU_TRIANGLES , GU_TRIANGLES , GU_LINE_STRIP, GU_TRIANGLE_FAN,GU_LINE_STRIP,GU_TRIANGLE_FAN };
+		static const int GUPrimitiveType[] = { GU_TRIANGLE_FAN , GU_TRIANGLE_FAN, GU_TRIANGLE_STRIP , GU_TRIANGLE_STRIP , GU_LINE_STRIP, GU_TRIANGLE_FAN,GU_LINE_STRIP,GU_TRIANGLE_FAN };
 
 		static const int sz[] = { 3, 4, 3, 4, 3, 4, 3, 4 };
 
@@ -302,7 +302,7 @@ public:
 		int batching = 0;
 		int batch_start = 0;
 		size_t batched_draws = 0;
-		int lastPolyPrimitive = GU_TRIANGLES;
+		int lastPolyPrimitive = GU_TRIANGLE_STRIP;
 
 		for(int i=0; i < polyCount; i++)
 		{
@@ -380,6 +380,8 @@ public:
 				batching = 0;
 			}
 
+			__asm__ volatile("viim.s S200, 232\n");
+
 			for(int j=0;j<vertexCount;j++){
 				//VERT &vert = clippedPoly.clipVerts[j];
 				VERT &vert = engine->vertlist->list[poly.vertIndexes[j]];
@@ -418,8 +420,7 @@ public:
 					"vmul.p 	    c000, c000, c102\n"
 					"vadd.p 	    c000, c000, c100\n"
 
-					"viim.s 	    S100, 192\n"
-					"vsub.s 	    S001, S100, S001\n"
+					"vsub.s 	    S001, S200, S001\n"
 
 					// save x and y z
 					"sv.s			S000, 0 + %0\n"
@@ -432,9 +433,7 @@ public:
 				);
 
 				if (!_3dOnTop)
-					out.x = (out.x + 240); 
-
-				out.y = (out.y + 40);
+					out.x = (out.x + 240);
 			}
 
 

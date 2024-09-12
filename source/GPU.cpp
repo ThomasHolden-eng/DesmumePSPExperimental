@@ -604,7 +604,9 @@ FORCEINLINE FASTCALL void GPU::_master_setFinal3dColor(int dstX, int srcX)
 	u8 alpha = color[3];
 	u8* dst = currDst;
 
-	if (red == 0xfa && green == 0xfa && blue == 0xfa) return; //transparent, I hope none of the games use this color
+	if (red == 0xfa && green == 0xfa && blue == 0xfa) {
+		return; //transparent, I hope none of the games use this color
+	}
 
 	u32 final = RGB15(0,0,0,1);
 	
@@ -2457,23 +2459,16 @@ void GPU::update_winh(int WIN_NUM)
 	//{
 	//	if((x < startX) || (x >= endX)) return false;
 	//}
-
+	
 	if(startX > endX)
 	{
-		for(int i=0;i<=endX;++i)
-			h_win[WIN_NUM][i] = 1;
-		for(int i=endX+1;i<startX;++i)
-			h_win[WIN_NUM][i] = 0;
-		for(int i=startX;i<256;++i)
-			h_win[WIN_NUM][i] = 1;
-	} else
+		memset(h_win[WIN_NUM], 1, 256 * sizeof(u8));
+		memset(h_win[WIN_NUM] + endX + 1, 0, (startX - (endX + 1)) * sizeof(u8));
+	}
+	else
 	{
-		for(int i=0;i<startX;++i)
-			h_win[WIN_NUM][i] = 0;
-		for(int i=startX;i<endX;++i)
-			h_win[WIN_NUM][i] = 1;
-		for(int i=endX;i<256;++i)
-			h_win[WIN_NUM][i] = 0;
+		memset(h_win[WIN_NUM], 0, 256 * sizeof(u8));
+		memset(h_win[WIN_NUM] + startX, 1, (endX - startX) * sizeof(u8));
 	}
 }
 

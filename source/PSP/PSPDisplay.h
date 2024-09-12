@@ -26,7 +26,7 @@ void DrawStartUpMenu();
 void OSLFINISH();
 
 void SetupDisp_EMU();
-void EMU_SCREEN();
+void EMU_SCREEN(bool, bool);
 void StartGU_RENDER();
 void ENDGU_RENDER();
 void SEND_DISP();

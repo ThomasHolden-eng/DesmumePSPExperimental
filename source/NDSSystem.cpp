@@ -649,7 +649,7 @@ u32 GameInfo::readROM(u32 pos)
 
 			return data;
 	#else
-		if (cached_rom.size() > ((1024 * 1024 * 1) - sizeof(u32))) cached_rom.clear();
+		if (cached_rom.size() > ((1024 * 1024 * 1) - 512)) cached_rom.clear();
 
 		u32 data = cached_rom[pos];
 
@@ -1295,7 +1295,9 @@ static void execHardware_hblank()
 	//don't try to do this at the end of the scanline, because some games (sonic classics) may use hblank IRQ to set
 	//scroll regs for the next scanline
 
-	if (nds.hw_status.VCount<192) {		
+	if (nds.hw_status.VCount<192) {
+
+		
 		triggerDma(EDMAMode_HBlank);
 	}
 
@@ -1707,7 +1709,7 @@ void NDS_exec(s32 nb)
 	executeARM7Stuff();
 	
 	if (PSP_UC(RenderDone)){
-		EMU_SCREEN();
+		EMU_SCREEN(frameSkipper.ShouldSkip2D(), frameSkipper.ShouldSkip3D());
 		PSP_UC(Do2dRender) = true;
 		return;
 	}
@@ -1716,7 +1718,7 @@ void NDS_exec(s32 nb)
 		if (my_config.enable_sound)
 		SPU_Emulate_core();
 
-		EMU_SCREEN();
+		EMU_SCREEN(frameSkipper.ShouldSkip2D(), frameSkipper.ShouldSkip3D());
 		renderScreenFull();
 	}
 

@@ -7,7 +7,7 @@
 
 #include "Disassembler.h"
 
-#include <functional>
+#include <functional> 
 
 bool instr_does_prefetch(u32 opcode);
 
@@ -34,59 +34,63 @@ const char * compiled_functions_hash =
     ">:1:07:88DD1AED:096B3BDA:7857790C:6D443C78:A4ADDB58" //a lot used in pokemon diamond 
     ;
 
+
+
+uint32_t conditional_label = 0;
+uint32_t jump_sz = 0;
+
 //make an array of pointers to functions of type void 
 //and pass the opcode to the function
-std::function<void(psp_gpr_t& psp_reg, opcode &op)> arm_preop[] = {
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {    //PRE_OP_LSL_IMM
+std::function<void(psp_gpr_t src, psp_gpr_t dst, opcode &op)> arm_preop[] = {
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {    //PRE_OP_LSL_IMM
         //printf("PRE_OP_LSL_IMM %d \n", op.imm);
-        //loadReg(psp_reg, op.rs2);
-        psp_reg = reg_alloc.getReg(op.rs2, psp_a1);
-        if(op.imm) emit_sll(psp_reg, psp_reg, op.imm);
+        //printf("IMM: 0x%x\n", emit_getCurrAdr());
+        emit_sll(dst, src, op.imm);
     },
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {    //PRE_OP_LSL_REG
-        //printf("PRE_OP_LSL_IMM %d \n", op.imm);
-        loadReg(psp_t0, op.rs2>>8);
-        emit_sltiu(psp_t1,psp_t0, 32);        
-        psp_reg = reg_alloc.getReg(op.rs2&0xff, psp_a1);
-        emit_sllv(psp_reg, psp_reg, psp_t0);
-        emit_movz(psp_reg, psp_zero, psp_t1);
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {   //PRE_OP_LSR_IMM
+        //printf("PRE_OP_LSR_IMM %d \n", op.imm);
+        emit_srl(dst, src, op.imm);
+    },
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {   //PRE_OP_ASR_IMM
+        emit_sra(dst, src, op.imm ? op.imm : 31); 
+    },
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {   //PRE_OP_ROR_IMM
 
-    },
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {   //PRE_OP_LSR_IMM
-        //printf("PRE_OP_LSR_IMM %d \n", op.imm);
-        if(op.imm) {
-            psp_reg = reg_alloc.getReg(op.rs2, psp_a1);
-            emit_srl(psp_reg, psp_reg, op.imm);
+        if (op.imm == 0){
+            emit_srl(dst, src, 1);
+            emit_ext(psp_t1, psp_gp, _flag_C8, _flag_C8);
+            emit_ins(dst, psp_t1, 31, 31);
+            return;
         }
-        else {
-            psp_reg = psp_zero;
-            //emit_move(psp_reg, psp_zero);
-        }
-    },
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {   //PRE_OP_LSR_REG
-        //printf("PRE_OP_LSR_IMM %d \n", op.imm);
-        loadReg(psp_t0, op.rs2>>8);
-        emit_sltiu(psp_t1,psp_t0, 32);        
-        psp_reg = reg_alloc.getReg(op.rs2&0xff, psp_a1);
-        emit_srlv(psp_reg, psp_reg, psp_t0);
-        emit_movz(psp_reg, psp_zero, psp_t1);
-    },
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {   //PRE_OP_ASR_IMM
-        //printf("PRE_OP_LSR_IMM %d \n", op.imm);
-        psp_reg = reg_alloc.getReg(op.rs2, psp_a1);
-        emit_sra(psp_reg,psp_reg,op.imm ? op.imm : 31); 
-    },
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {   //PRE_OP_ASR_REG
-        //printf("PRE_OP_LSR_IMM %d \n", op.imm);
-        //TODO
-    },
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {   //PRE_OP_ROR_IMM
-        //TODO
+        
+        emit_rotr(dst, src, op.imm);
     },
 
-    [] (psp_gpr_t& psp_reg, opcode& op) -> void {   //PRE_OP_NONE
-        //TODO
-    }
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {    //PRE_OP_LSL_REG
+        //printf("PRE_OP_LSL_IMM %d \n", op.imm);
+        int32_t regs[1] = {op.imm};
+        regman.get(1, regs);   
+        emit_sllv(dst, src, regs[0]);
+    },
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {   //PRE_OP_LSR_REG
+        //printf("PRE_OP_LSR_IMM %d \n", op.imm);
+        int32_t regs[1] = {op.imm};
+        regman.get(1, regs);      
+        emit_srlv(dst, src, regs[0]);
+    },
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {   //PRE_OP_ASR_REG
+        //printf("PRE_OP_LSR_IMM %d \n", op.imm);
+        int32_t regs[1] = {op.imm};
+        regman.get(1, regs);   
+        emit_srav(dst, src, regs[0]);
+    }, 
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void {   //PRE_OP_ROR_REG
+        int32_t regs[1] = {op.imm};
+        regman.get(1, regs); 
+        emit_rotrv(dst, src, regs[0]);
+    },
+
+    [] (psp_gpr_t src, psp_gpr_t dst, opcode& op) -> void { }  //PRE_OP_NONE
 };
 
 #define cpu (&ARMPROC)
@@ -141,78 +145,67 @@ inline u32 emit_lua(u32 reg,u32 data)
 	return lo;
 }
 
-uint32 emit_Halfbranch(int cond)
-{
-	static const uint8 cond_bit[] = {0x40, 0x40, 0x20, 0x20, 0x80, 0x80, 0x10, 0x10};
+void generate_condition_check(int cond){
+    static const uint8 cond_bit[] = {0x40, 0x40, 0x20, 0x20, 0x80, 0x80, 0x10, 0x10};
 
 	if(cond < 8)
 	{
-      emit_andi(psp_t0, psp_gp, cond_bit[cond]);
+      emit_andi(psp_s4, psp_gp, cond_bit[cond]);
+      return;
+    }
 
-      emit_nop();
-      emit_nop();
-      return emit_getPointAdr() - 8;
-	}
+    switch (cond){
+    
+        case 8:  
+        case 9:
+            emit_ext(psp_a1,psp_gp,6,5);
+            emit_xori(psp_s4,psp_a1,0b01);
+        break;
+    
+        case 10:
+        case 11:
+    
+            emit_ext(psp_a1,psp_gp,7,7);
+            emit_ext(psp_at,psp_gp,4,4);
+    
+            emit_xor(psp_s4,psp_a1,psp_at);
+        break;
+    
+        case 12:
+        case 13:
+    
+            emit_ext(psp_a1,psp_gp,7,6);
+            emit_ext(psp_at,psp_gp,4,3);
+    
+            emit_andi(psp_at,psp_at,0b10);
+            emit_xor(psp_s4,psp_a1,psp_at);
+        break;
+    }
+}
 
-   switch (cond){
+uint32 emit_Halfbranch(int cond, bool generate_condition = true)
+{
+    if (generate_condition) generate_condition_check(cond);
 
-      case 8:  
-      case 9:
-         emit_ext(psp_a1,psp_gp,6,5);
-         emit_xori(psp_t0,psp_a1,0b01);
-
-         emit_nop();
-         emit_nop();
-      break;
-
-      case 10:
-      case 11:
-
-         emit_ext(psp_a1,psp_gp,7,7);
-         emit_ext(psp_at,psp_gp,4,4);
-
-         emit_xor(psp_t0,psp_a1,psp_at);
-
-         emit_nop();
-         emit_nop();
-
-      break;
-
-      case 12:
-      case 13:
-
-         emit_ext(psp_a1,psp_gp,7,6);
-         emit_ext(psp_at,psp_gp,4,3);
-
-         emit_andi(psp_at,psp_at,0b10);
-         emit_xor(psp_t0,psp_a1,psp_at);
-
-         emit_nop();
-         emit_nop();
-      break;
-
-      default:
-        return 0;
-        //die("emit_Halfbranch: invalid cond\n"); 
-   }
-
-   return emit_getPointAdr() - 8;
+    emit_nop();
+    emit_nop();
+    return emit_getPointAdr() - 8;
 }
 
 void CompleteCondition(u32 cond, u32 _addr, u32 label){
     if(cond < 8)
 	{
       if (cond&1)
-         emit_bnelC(psp_t0,psp_zero,label,_addr);
+         emit_bnelC(psp_s4,psp_zero,label,_addr);
       else
-         emit_beqlC(psp_t0,psp_zero,label,_addr);
+         emit_beqlC(psp_s4,psp_zero,label,_addr);
       return;
    }
 
    if (cond&1)
-      emit_beqlC(psp_t0,psp_zero,label,_addr);
+      emit_beqlC(psp_s4,psp_zero,label,_addr);
    else
-      emit_bnelC(psp_t0,psp_zero,label,_addr);
+      emit_bnelC(psp_s4,psp_zero,label,_addr);
 }
 
 void emit_prefetch(const u8 isize, bool saveR15, bool is_ITP){
@@ -244,32 +237,88 @@ INLINE void emit_bic(u32 dst,u32 a0, u32 a1)
 INLINE void emit_bici(u32 dst,u32 a0, u32 a1)
 {
 	emit_andi(dst, a0, ~a1);
-}                  
+}  
+
+#define END_OP(_rd) \
+    {\
+        regman.mark_dirty((psp_gpr_t)_rd);\
+        if (!rd_allocated) regman.flush((psp_gpr_t)_rd);\
+    }
+
+#define END_OP_CHKR15(_rd) \
+    {\
+        regman.mark_dirty((psp_gpr_t)_rd);\
+        if (op.rd == 15) \
+            emit_sw(_rd, RCPU, _next_instr);\
+    }
+
+#define HANDLE_CONDITIONAL(branchless_code, branch_code)                             \
+    do {                                                                             \
+        if ((rd_allocated) && (op).condition != -1) {                                \
+            conditional_branchless(regs[0], psp_at,                                  \
+                {                                                                    \
+                    branchless_code                                                  \
+                }                                                                    \
+            );                                                                       \
+            END_OP_CHKR15(regs[0]);                                                  \
+        } else {                                                                     \
+            conditional(                                                             \
+                branch_code                                                          \
+                END_OP_CHKR15(regs[0]);                                              \
+            );                                                                       \
+        }                                                                            \
+    } while(0)
  
+#define HANDLE_CONDITIONAL_NR15(branchless_code, branch_code)                        \
+    do {                                                                             \
+        if ((rd_allocated) && (op).condition != -1) {                                \
+            conditional_branchless(regs[0], psp_at,                                  \
+                {                                                                    \
+                    branchless_code                                                  \
+                }                                                                    \
+            );                                                                       \
+            END_OP(regs[0]);                                                         \
+        } else {                                                                     \
+            conditional(                                                             \
+                branch_code                                                          \
+                END_OP(regs[0]);                                                     \
+            );                                                                       \
+        }                                                                            \
+    } while(0)
+  
 #define gen_nativeOP(opType, n_op, n_op_imm, sign) \
 template <bool imm, bool rev> void arm_##opType(opcode &op){ \
-    psp_gpr_t rs1 = reg_alloc.getReg(op.rs1, psp_a0); \
-    psp_gpr_t dst = reg_alloc.getReg(op.rd, psp_v0, false); \
+    int32_t regs[3] = {(op.condition != -1) ? op.rd : (op.rd | 0x10), op.rs1, op.rs2};\
+    const int reg_count = imm ? 2 : 3;\
+    regman.get(reg_count, regs); \
+    const psp_gpr_t dst = (op.condition != -1) ? psp_at : (psp_gpr_t)regs[0];\
     if (imm){ \
-        if (!rev && is_##sign##16(op.imm)) \
-            emit_##n_op_imm(dst, rs1, op.imm); \
-        else{ \
-            emit_li(psp_a1, op.imm); \
-            if (!rev) \
-                emit_##n_op(dst, rs1, psp_a1); \
-            else \
-                emit_##n_op(dst, psp_a1, rs1); \
+        if (!rev && is_##sign##16(op.imm)) { \
+            conditional_branchless(regs[0], dst, \
+            { \
+                emit_##n_op_imm(dst, regs[1], op.imm);\
+            });\
+        } else{ \
+            conditional_branchless(regs[0], dst, \
+            { \
+                emit_li(psp_at, op.imm); \
+                if (!rev) \
+                    emit_##n_op(dst, regs[1], psp_at); \
+                else \
+                    emit_##n_op(dst, psp_at, regs[1]);\
+            });\
         } \
     }else{ \
-        psp_gpr_t rs2 = psp_zero; \
-        arm_preop[op.preOpType](rs2 , op); \
-        if (!rev) \
-                emit_##n_op(dst, rs1, rs2); \
-        else \
-            emit_##n_op(dst, rs2, rs1); \
+        conditional_branchless(regs[0], dst,\
+        { \
+            arm_preop[op.preOpType]((psp_gpr_t)regs[2], psp_at, op); \
+            if (!rev) \
+                    emit_##n_op(dst, regs[1], psp_at); \
+            else \
+                emit_##n_op(dst, psp_at, regs[1]); \
+        });\
     } \
-    if (op.rd == 15) \
-        emit_sw(dst, RCPU, _next_instr); \
+    END_OP_CHKR15(regs[0]); \
 }
 
 gen_nativeOP(and, and, andi, u);
@@ -282,123 +331,25 @@ gen_nativeOP(bic, bic, bici, u);
 //Do you want speed? call this function if you want to see some black magic :D
 
 void block::optimize_basicblock(){
+
+    // Now useless since it behaved like a SRA but without actually allocating the registers
+    // Maybe we can use it for something else (like removing useless operations)
+
+
+    // Check if we can merge togheter a conditional check with 2 or more opcodes
+    // Example:
+    // moveq r0, #0
+    // moveq r1, #0
+    // They both rely on the same condition (eq), so we can merge them togheter and do the check just once
+    // However we can do this only the opcode that support the branchless check
     opcode *prev_op = 0;
 
-
-    //opcode &last_op = opcodes.back();
-
-    return;
-
-
-    //check if the block is a data invalidate block
-    if (opcodes.size() == 4){
-        if (opcodes[0]._op == OP_MOV && opcodes[1]._op == OP_MRC_MCR){
-            printf("data invalidate block detected\n");
-
-            //do just the last jump
-            opcodes.erase(opcodes.begin(), opcodes.begin() + 3);
-
-            printf("block size: %d\n", opcodes.size());
-        }
-    }
-
-
-
     for(opcode& op : opcodes){
-
-        if (prev_op && prev_op->_op == OP_ITP && op.condition == -1 && op._op == OP_ITP) op.extra_flags = EXTFL_SKIPSAVEFLAG;
-        if (prev_op && prev_op->_op == OP_ITP && prev_op->condition == -1) prev_op->extra_flags = EXTFL_SKIPLOADFLAG;
-
-        // combine branches (slows down the emulator for some strange reason)
-        /*if (prev_op && op.op_pc != opcodes.back().op_pc){
-            //skip only the ops that doesn't change the flags
-            if (( prev_op->_op <= OP_MVN && prev_op->_op > OP_ITP && op._op > OP_ITP && op._op <= OP_MVN)  && prev_op->condition == op.condition && op.condition != -1){
-                if (prev_op->extra_flags & EXTFL_SAVECOND) prev_op->extra_flags ^= EXTFL_SAVECOND;
-                //if (prev_op->extra_flags & EXTFL_RELOADPC) prev_op->extra_flags ^= EXTFL_RELOADPC;
-                op.extra_flags |= EXTFL_MERGECOND;
-
-                if ( prev_op && (prev_op->_op == OP_MOV || prev_op->_op == OP_MVN || prev_op->_op == OP_MOV_S || prev_op->_op == OP_MEMCPY) && 
-                    (op._op >= OP_AND && op._op <= OP_SUB || (op._op >= OP_MOV && op._op <= OP_STRH)) && 
-                    prev_op->rd == op.rs2 && (prev_op->preOpType == PRE_OP_LSL_IMM || prev_op->preOpType == PRE_OP_ASR_IMM) && prev_op->condition == op.condition) {
-
-                    if (op.rd == prev_op->rd) prev_op->rd = -1;
-                    op.rs2 = -1;
-                }
-
-                //op.extra_flags |= EXTFL_RELOADPC;
-            }
-        }*/
-
-        //check for useless operation
-        /*if (op.preOpType == PRE_OP_IMM && (op.imm == 0))
-        {
-            if ((op._op == OP_ORR || op._op == OP_EOR || op._op == OP_SUB)) {
-                printf("Translated to move - OP: %x\n", op._op);
-                op._op = OP_MOV;
-                op.preOpType = PRE_OP_NONE;
-            }else if (op._op == OP_AND) {
-                printf("Translated AND to mov0\n");
-                op._op = OP_MOV;
-                op.imm = 0;
-                op.preOpType = PRE_OP_IMM;
-            }else if (op._op == OP_RSB) {
-                //printf("Translated RSB to neg\n");
-                //printf("rd : %d op.rs1: %d, op.rs2: %d\n", op.rd, op.rs1, op.rs2);
-                op._op = OP_NEG; 
-            } 
-        }
-
-
-        // optimize mul if we can
-        /*if (prev_op && prev_op->_op == OP_MOV && prev_op->preOpType == PRE_OP_IMM && op._op == OP_MUL && prev_op->rd == op.rs2){
-            //if (op.rs1 == op.rs2)
-           //printf("optimized mul %d\n", prev_op->imm);
-
-           op._op = OP_FAST_MUL;
-           prev_op = &op;
-          // continue;
-        }*/
-    #if 1
-        if (prev_op && prev_op->_op == OP_LDRH && (op._op == OP_STRH /*|| op._op == OP_STR*/) && prev_op->rd == op.rs1 && op.extra_flags & EXTFL_DIRECTMEMACCESS && prev_op->extra_flags & EXTFL_DIRECTMEMACCESS){
-            
-            
-            if (prev_op->preOpType == PRE_OP_IMM && op.preOpType == PRE_OP_IMM){
-                prev_op->_op = OP_NOP;
-                op._op = OP_MEMCPY;
-                op.preOpType = op._op == OP_STR ? OP_32BIT : OP_16BIT;
-                op.rs2 = prev_op->rs1;
-                //printf("prev_op->imm: %d, op.imm: %d\n", prev_op->imm, op.imm);
-                op.imm = prev_op->imm | (op.imm << 16);
-                /*printf("prev_op->imm: %d, op.imm: %d\n", op.imm&0xFFFF, op.imm>>16);
-                printf("______________\n");*/
-
-            }
-
-        }
-
-        //severe speed gain with that !
-        if ( prev_op && (prev_op->_op == OP_MOV || prev_op->_op == OP_MVN || prev_op->_op == OP_MOV_S || prev_op->_op == OP_MEMCPY) && 
-             (op._op >= OP_AND && op._op <= OP_SUB || (op._op >= OP_MOV && op._op <= OP_STRH)) && 
-             prev_op->rd == op.rs2 && (prev_op->preOpType == PRE_OP_LSL_IMM || prev_op->preOpType == PRE_OP_ASR_IMM) && prev_op->condition == op.condition) {
-
-            if (op.rd == prev_op->rd) prev_op->rd = -1;
-            op.rs2 = -1;
-        }
-        #endif
-
+        if (prev_op && prev_op->_op != OP_ITP && prev_op->condition != -1 && op.condition == prev_op->condition) op.check_condition = false;
         prev_op = &op;
     } 
 
-    /*if (noReadWriteOP && branch_addr == start_addr){
-        for(opcode& op : opcodes){
-            if (op._op == OP_SWI){
-                idleLoop = true;
-                printf("idle loop detected\n");
-                break;
-            }
-        }
-    }*/
-
+    return;
 }
 
 void block::optimize_basicblockThumb(){
@@ -483,8 +434,10 @@ bool flag_loaded = false;
 bool use_flags = false;
 bool islast_op = false;
 
+bool flag_dirty = false;
+
 void load_flags(){
-    if (use_flags && !flag_loaded)
+    //if (use_flags && !flag_loaded)
     {
         emit_lbu(psp_gp, RCPU, _flags+3);
         flag_loaded = true;
@@ -499,10 +452,13 @@ void store_flags(){
     }
 }
    
+
+
 template<int PROCNUM>
 void emitARMOP(opcode& op){  
-    uint32_t conditional_label = 0;
-    uint32_t jump_sz = 0;
+
+    const bool rd_allocated = regman.is_mapped(op.rd);
+    
 
     switch(op._op){
   
@@ -510,7 +466,9 @@ void emitARMOP(opcode& op){
         {
 
             conditional(
-                store_flags();
+                if (flag_dirty) store_flags();
+
+                flag_dirty = false;
                 
                 emit_li(psp_a0, op.rs1); 
 
@@ -519,26 +477,21 @@ void emitARMOP(opcode& op){
                 emit_jal(arm_instructions_set[INSTRUCTION_INDEX(op.rs1)]); 
                 emit_Write32(optmizeDelaySlot);
 
-                load_flags()
+                load_flags();
             )
 
             intr_instr++;
         }
         break; 
         case OP_AND:{ 
-            const uint32_t weak_tag = (op.condition == 14) ? 0x10 : 0;
-            int32_t regs[2] = { op.rd | 0x10, op.rs1 | weak_tag };
-            regman.get(2, regs);
-           //loadReg(psp_a0, op.rs1);
 
-           conditional(
-                emit_li(psp_v1, op.imm);
-                emit_and(regs[0], regs[1], psp_v1)
-            )
-  
-           regman.mark_dirty((psp_gpr_t)regs[0]);
-
-           //regman.flush((psp_gpr_t)regs[0]);
+            if (op.preOpType == PRE_OP_IMM){
+                arm_and<true, false>(op);
+            }
+            else {
+                //printf("IMM: 0x%x\n", emit_getCurrAdr());
+                arm_and<false, false>(op);
+            }
         } 
         break;
  
@@ -550,19 +503,13 @@ void emitARMOP(opcode& op){
         break;
 
         case OP_ORR:{
-            const uint32_t weak_tag = (op.condition == 14) ? 0x10 : 0;
-            int32_t regs[2] = { op.rd | 0x10, op.rs1 | weak_tag };
-            regman.get(2, regs);
-           //loadReg(psp_a0, op.rs1);
-
-           conditional(
-                emit_li(psp_v1, op.imm);
-                emit_or(regs[0], regs[1], psp_v1)
-            )
-  
-           regman.mark_dirty((psp_gpr_t)regs[0]);
-
-           //regman.flush((psp_gpr_t)regs[0]);
+            
+            if (op.preOpType == PRE_OP_IMM){
+                arm_or<true, false>(op);
+            }
+            else {
+                arm_or<false, false>(op);
+            }
         break;
         }
 
@@ -576,38 +523,26 @@ void emitARMOP(opcode& op){
 
         case OP_ADD:
         {
-            int32_t regs[2] = { op.rd | 0x10, op.rs1 };
-            regman.get(2, regs);
-            //loadReg(psp_a0, op.rs1);
 
-            //printf("at 0x%x rd :%d\n", emit_getCurrAdr(), op.rd);
+            if (op.preOpType == PRE_OP_LSL_IMM)
+                printf("0x%x\nr1: %d, r2: %d, r3: %d\n", emit_getCurrAdr(), op.rd, op.rs1, op.rs2);
 
-            conditional(
-                emit_li(psp_v1, op.imm);
-                emit_addu(regs[0], regs[1], psp_v1)
-            )
-
-            regman.mark_dirty((psp_gpr_t)regs[0]);
-
-            //TODO IMPORTANT: FIND THE CONDITION WHERE WE CAN SKIP THE FORCED STORE 
-            // Let me guess
-            //regman.flush((psp_gpr_t)regs[0]);
+            if (op.preOpType == PRE_OP_IMM){
+                arm_add<true, false>(op);
+            }
+            else {
+                arm_add<false, false>(op);
+            }
             break;
         }
        case OP_SUB:
        {
-            int32_t regs[2] = { op.rd | 0x10, op.rs1 };
-            regman.get(2, regs);
-           //loadReg(psp_a0, op.rs1);
-
-           conditional(
-                emit_li(psp_v1, op.imm);
-                emit_subu(regs[0], regs[1], psp_v1)
-            )
-  
-           regman.mark_dirty((psp_gpr_t)regs[0]);
-
-           //regman.flush((psp_gpr_t)regs[0]);
+            if (op.preOpType == PRE_OP_IMM){
+                arm_sub<true, false>(op);
+            }
+            else {
+                arm_sub<false, false>(op);
+            }
         break;
     }
 
@@ -620,138 +555,299 @@ void emitARMOP(opcode& op){
         break;
         case OP_MUL:
         {
-            int32_t regs[3] = { op.rd | 0x10, op.rs1, op.rs2 };
-            regman.get(3, regs);
+            int32_t regs[3] = { op.condition != -1 ? op.rd : (op.rd | 0x10), op.rs1, op.rs2 };
             
-            conditional(
-                emit_mult(regs[1], regs[2]);
-                emit_mflo(regs[0])
-            )
-    
-            regman.mark_dirty((psp_gpr_t)regs[0]);
-
-            //regman.flush((psp_gpr_t)regs[0]);
+            HANDLE_CONDITIONAL_NR15(
+                {
+                    regman.get(3, regs);
+                    
+                    emit_mult(regs[1], regs[2]);
+                    emit_mflo(psp_at);
+                },{
+                    regman.get(3, regs);
+                    
+                    emit_mult(regs[1], regs[2]);
+                    emit_mflo(regs[0]);
+                }
+            );
             break; 
         }
 
         case OP_MLA:
         {
-            int32_t regs[4] = { op.rd | 0x10, op.rs1, op.rs2, op.imm };
-            regman.get(4, regs);
+            int32_t regs[4] = { op.condition != -1 ? op.rd : (op.rd | 0x10), op.rs1, op.rs2, op.imm };
             
-            conditional(
-                emit_mult(regs[1], regs[2]);
-                emit_mflo(psp_t0);
-                emit_addu(regs[0], psp_t0, regs[3])
-            )
-  
-            regman.mark_dirty((psp_gpr_t)regs[0]);
+            HANDLE_CONDITIONAL_NR15(
+                {
+                    regman.get(4, regs);
+                    
+                    emit_mult(regs[1], regs[2]);
+                    emit_mflo(psp_at);
+                    emit_addu(psp_at, psp_at, regs[3]);
+                },{
+                    regman.get(4, regs);
+                    
+                    emit_mult(regs[1], regs[2]);
+                    emit_mflo(psp_at);
+                    emit_addu(regs[0], psp_at, regs[3]);
+                }
+            );
+            break; 
+        }
 
-            //regman.flush((psp_gpr_t)regs[0]);
+        case OP_UMUL:{
+            int32_t regs[4] = { op.condition != -1 ? op.rd : (op.rd | 0x10), op.condition != -1 ? op.rd : (op.rd | 0x10), op.rs1, op.rs2 };
+            
+            HANDLE_CONDITIONAL_NR15(
+                {
+                    regman.get(4, regs);
+                    
+                    emit_multu(regs[2], regs[3]);
+                    emit_mflo(psp_at);
+                    emit_mfhi(regs[1]);
+                    END_OP(regs[1]);
+                },{
+                    regman.get(4, regs);
+                    
+                    emit_multu(regs[2], regs[3]);
+                    emit_mflo(regs[0]);
+                    emit_mfhi(regs[1]);
+                    END_OP(regs[1]);
+                }
+            );
+            break; 
+        }
+
+        case OP_UMLA:{
+            int32_t regs[4] = { op.condition != -1 ? op.rd : (op.rd | 0x10), op.rs1, op.rs2, op.imm };
+            
+            HANDLE_CONDITIONAL_NR15(
+                {
+                    regman.get(4, regs);
+                    
+                    emit_multu(regs[1], regs[2]);
+                    emit_mflo(psp_at);
+                    emit_addu(psp_at, psp_at, regs[3]);
+                },{
+                    regman.get(4, regs);
+                    
+                    emit_multu(regs[1], regs[2]);
+                    emit_mflo(psp_at);
+                    emit_addu(regs[0], psp_at, regs[3]);
+                }
+            );
             break; 
         }
 
         case OP_CLZ:
         {
-            int32_t regs[2] = { op.rd | 0x10, op.rs1};
+            int32_t regs[2] = {op.rd, op.rs1};
             regman.get(2, regs);
-
-            conditional(emit_clz(regs[0], regs[1]));
+            
+            const psp_gpr_t dst = (op.condition != -1) ? psp_at : (psp_gpr_t)regs[0];
+            
+            conditional_branchless(regs[0], dst,{
+                emit_clz(dst, regs[1]);
+            });
 
             regman.mark_dirty((psp_gpr_t)regs[0]);
-
-           // regman.flush((psp_gpr_t)regs[0]);
-            break;
-        }
-
-        case OP_NEG:
-        {
-            psp_gpr_t dst = reg_alloc.getReg(op.rd, psp_v0, false);
-            psp_gpr_t rs1 = reg_alloc.getReg(op.rs1, psp_a0);
-            emit_negu(dst, rs1);
             break;
         }
 
         case OP_SWI:
         {
-           reg_alloc.dealloc_all(); 
-           emit_jal(cpu->swi_tab[op.rs1]); 
-           emit_nop();
+            conditional(
+                emit_jal(cpu->swi_tab[op.rs1]); 
+                emit_nop();
+            )
         }
 
         case OP_MOV:
         case OP_MVN:
         {
+            int32_t regs[2] = { op.condition != -1 ? op.rd : op.rd | 0x10, op.rs2};
 
-            //psp_gpr_t dst = reg_alloc.getReg(op.rd, psp_v0, false);
-            int32_t regs[2] = { op.rd, -1};
-            regman.get(2, regs);
-
-            conditional(emit_li(regs[0], op.imm));
-    
-            regman.mark_dirty((psp_gpr_t)regs[0]);
-            //regman.flush((psp_gpr_t)regs[0]);
-            
-
-            /*if (op.imm == 0 && op.preOpType == PRE_OP_IMM){
-                emit_move(dst, psp_zero);
-                break;
-            }*/
-
-            /*if (op.preOpType == PRE_OP_IMM){
-                int32_t regs[1] = { op.rd | 0x10};
+            if (op.preOpType == PRE_OP_IMM){
                 regman.get(1, regs);
+                const psp_gpr_t dst = (op.condition != -1) ? psp_at : (psp_gpr_t)regs[0]; 
 
-                emit_li(regs[0], op.imm);
-                printf("op.imm: %d\n", op.imm);
-        
-                regman.mark_dirty((psp_gpr_t)regs[0]);
-                regman.flush((psp_gpr_t)regs[0]);
-                //emit_li(dst, op.imm);
-            }else{*/
-                /*psp_gpr_t rs1 = reg_alloc.getReg(op.rs1, psp_a1);
+                conditional_branchless(regs[0], ((op.imm == 0 && op.condition != -1) ? psp_zero : dst),
+                    {
+                        if (op.imm != 0) emit_li(dst, op.imm);
+                        else if (op.imm == 0 && op.condition == -1) emit_move(dst, psp_zero);
+                    }
+                );
 
-                if (op.preOpType != PRE_OP_NONE){
-                    arm_preop[op.preOpType](rs1, op);
+                END_OP_CHKR15(regs[0])
+            }else{ 
+                regman.get(2, regs);
+                const psp_gpr_t dst = (op.condition != -1) ? psp_at : (psp_gpr_t)regs[0];
+                
+                conditional_branchless(regs[0], dst,
+                    {
+                        arm_preop[op.preOpType]((psp_gpr_t)regs[1], dst, op);
 
-                    if (op._op == OP_MVN)
-                        emit_not(dst, rs1);
-                    else
-                        emit_move(dst, rs1);
-                }
+                        if (op._op == OP_MVN)
+                            emit_not(dst, dst);
+                    }
+                );
 
-                if (op.rd == 15)
-                    emit_sw(dst, RCPU, _next_instr);*/
-            //}
-            
+                END_OP_CHKR15(regs[0])
+            }
             break;
         }
 
         case OP_BXC:
         {
-            emit_li(psp_a0, op.imm);
-            emit_addu(psp_fp, psp_fp, psp_a0);
-            
-            // cpu->R[15] = tmp & (0xFFFFFFFC|(cpu->CPSR.bits.T<<1));
-            /*emit_ext(psp_fp, psp_a0, 1, 31);
-            emit_sll(psp_fp, psp_fp, 1);*/
-            emit_ins(psp_fp, psp_zero, 1, 0);
-            //emit_srlv(psp_fp, psp_fp, psp_t0);
+            int32_t regs[1] = {op.rd};
 
-            emit_sw(psp_fp, psp_k0, _R15);
-            emit_sw(psp_fp, psp_k0, _next_instr);
-            emit_sw(psp_fp, psp_k0, _instr_adr);
+            //printf("0x%x\n", (u32)emit_getCurrAdr());
+            conditional(
+                regman.get(1, regs);
+
+                if (is_u16(op.imm)){
+                    emit_addiu(regs[0], regs[0], op.imm); 
+                }else{
+                    emit_li(psp_a0, op.imm);             
+                    emit_addu(regs[0], regs[0], psp_a0);  
+                }
+                 
+                emit_ins(regs[0], psp_zero, 1, 0);  
+
+                emit_sw(regs[0], RCPU, _instr_adr);
+                emit_sw(regs[0], RCPU, _next_instr);
+                regman.mark_dirty((psp_gpr_t)regs[0]);
+                regman.flush((psp_gpr_t)regs[0]);
+
+            )
+        }break;
+
+        case OP_STR:
+        case OP_STRH:
+        {
+            int32_t regs[2] = { op.rd, op.rs1};
+
+            regman.flush_all();  
+
+            conditional(
+                regman.get(2, regs);
+
+                if (op.preOpType == PRE_OP_IMM)  {
+                    if (is_u16(op.imm)){
+                        emit_addiu(psp_a0, regs[0], op.imm); 
+                    }else{
+                        emit_li(psp_a0, op.imm);             
+                        emit_addu(psp_a0, regs[0], psp_a0);  
+                    }
+                }
+                else if (op.preOpType == PRE_OP_PRE_P || op.preOpType == PRE_OP_PRE_M)   {
+                    emit_addiu(psp_a0, regs[0], op.imm);
+                    storeReg(psp_a0, op.rd);
+                }
+                else if (op.preOpType == PRE_OP_POST_P || op.preOpType == PRE_OP_POST_M)   {
+                    emit_move(psp_a0, regs[0]);
+                }
+                
+                emit_move(psp_a1, regs[1]);
+                
+                if (OP_STRH == op._op) {
+                    emit_jal(_MMU_write16<PROCNUM>); 
+                    emit_ins(psp_a0, psp_zero, 0, 0);
+                } else {
+                    emit_jal(_MMU_write32<PROCNUM>);
+                    emit_ins(psp_a0, psp_zero, 1, 0);
+                }
+
+                regman.reset(); 
+
+                //optimization: mantain the address in the register since it won't change
+
+                if (op.preOpType == PRE_OP_POST_P || op.preOpType == PRE_OP_POST_M){
+                    
+                    emit_addiu(regs[0], regs[0], op.imm);
+                    
+                    /*if (op.condition == -1) {
+                        regman.map(op.rd, (psp_gpr_t)regs[0]);
+                        regman.mark_dirty((psp_gpr_t)regs[0]);
+                    }
+                    else*/                    storeReg((psp_gpr_t)regs[0], op.rd);
+                    
+                    //printf("Mapped %d to %d 0x%x\n", op.rd, regs[0], (u32)emit_getCurrAdr());
+                }
+            )
+
+            
+
+            /*if (op.rs1 > 3){
+                regman.map(op.rs1, (psp_gpr_t)regs[1]);
+            }*/
         }
         break;
 
+        case OP_LDRH:
+        case OP_LDR:
+        {
+            int32_t regs[2] = {op.rd | 0x10, op.rs1};
+
+            regman.flush_all(); 
+
+            //printf("0x%x\n", (u32)emit_getCurrAdr()); 
+
+            conditional(
+                regman.get(2, regs);
+
+                if (op.preOpType == PRE_OP_IMM)  {
+                    if (is_u16(op.imm)){
+                        emit_addiu(psp_a0, regs[1], op.imm); 
+                    }else{
+                        emit_li(psp_a0, op.imm);             
+                        emit_addu(psp_a0, regs[1], psp_a0);  
+                    }
+                }
+                else if (op.preOpType == PRE_OP_PRE_P || op.preOpType == PRE_OP_PRE_M)   {
+                    emit_addiu(psp_a0, regs[1], op.imm);
+                    storeReg(psp_a0, op.rs1);
+                }
+                else if (op.preOpType == PRE_OP_POST_P || op.preOpType == PRE_OP_POST_M)   {
+                    emit_move(psp_a0, regs[1]);
+                    emit_addiu(psp_t1, psp_a0, op.imm);
+                    storeReg(psp_t1, op.rs1);
+                }
+                    
+                
+
+                if (OP_LDRH == op._op) {
+                    emit_jal(_MMU_read16<PROCNUM>); 
+                    emit_ins(psp_a0, psp_zero, 0, 0);
+
+                    emit_move(regs[0], psp_v0);
+                } else {
+                    emit_sll(regs[0], psp_a0, 3);
+
+                    emit_jal(_MMU_read32<PROCNUM>);
+                    emit_ins(psp_a0, psp_zero, 1, 0);
+                    
+                    emit_rotrv(regs[0], psp_v0, regs[0]);
+                }
+
+                
+                regman.reset(); 
+
+                /*if (op.condition == -1) {
+                    regman.map(op.rd, (psp_gpr_t)regs[0]);
+                    regman.mark_dirty((psp_gpr_t)regs[0]);
+                }
+                else*/                    
+                    storeReg((psp_gpr_t)regs[0], op.rd);
+            )
+            
+        }
+        break;
+
+        case OP_STMIA:
         case OP_NOP:
         case OP_FAST_MUL:
-        case OP_STMIA:
-        case OP_LSR_0:
-        case OP_LDRH:
-        case OP_STRH:
-        case OP_LDR:
-        case OP_STR:
+        case OP_LSR_0:        
         case OP_CMP:
         case OP_TST:
         case OP_AND_S:
@@ -761,6 +857,7 @@ void emitARMOP(opcode& op){
         case OP_SUB_S:
         case OP_MOV_S:
         case OP_MVN_S:
+        case OP_NEG:
 
         break;
 
@@ -838,25 +935,21 @@ bool block::emitArmBlock(){
 
     regman.reset();
 
-    int dyna_count = 0;
-    for(opcode& op : opcodes) {
-        if (op._op == OP_ADD || op._op == OP_SUB || op._op == OP_MOV || op._op == OP_MVN || op._op == OP_AND || op._op == OP_ORR || op._op == OP_EOR ||  op._op == OP_MUL || op._op == OP_MLA || op._op == OP_CLZ )
-            dyna_count++;
-    }
-
-    if (dyna_count > 3) {
-        printf("dyna_count: %d\n", dyna_count);
-        printf("0x%x\n", (u32)emit_getCurrAdr());
-    }
-
-
+    const u8 isize =  4;
     for(opcode op : opcodes){ 
-        const u8 isize =  4;
 
-        if (op._op == OP_ITP || op._op == OP_SWI){
-            regman.flush_all();
-            regman.reset();
+        if ((op._op == OP_ITP || op._op == OP_SWI)) 
+        {
+            regman.flush_all();  
+            regman.reset();  
         }
+
+        if (op.condition != -1) {
+            // not sure if this is the only one to flush... might be that rs1 and rs2 are also needed to be flushed
+            // TODO: check if rs1 and rs2 are needed to be flushed
+            //regman.flush_nds(op.rd);  
+        }
+
 
         if (last_op.op_pc != op.op_pc)
             emit_prefetch(isize, op.rs1 == 15 || op.rs2 == 15, op._op == OP_ITP);
@@ -871,7 +964,7 @@ bool block::emitArmBlock(){
     regman.flush_all();
     regman.reset();
 
-    store_flags();
+    if (flag_dirty) store_flags();
    
  
     //possible idle loop, do more checks here

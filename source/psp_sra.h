@@ -138,7 +138,7 @@ class register_manager
    private:
       psp_gpr_t find(uint32_t emu_reg_id)
       {
-         for (int i = psp_s0; i != psp_s5; i ++)
+         for (int i = psp_s0; i < psp_s4; i ++)
          {
             if (mapping[i] == emu_reg_id)
             {
@@ -171,7 +171,7 @@ class register_manager
          psp_gpr_t result = psp_s0;
          uint32_t lowtag = 0xFFFFFFFF;
 
-         for (int i = psp_s0; i != psp_s5; i ++)
+         for (int i = psp_s0; i < psp_s4; i ++)
          {
             if (usage_tag[i] < lowtag)
             {
@@ -184,6 +184,26 @@ class register_manager
       }
 
    public:
+
+      bool is_mapped(uint32_t emu_reg_id)
+      {
+         for (int i = psp_s0; i < psp_s4; i ++)
+         {
+            if (mapping[i] == emu_reg_id)
+            {
+               return true;
+            }
+         }
+      }
+
+      void map(uint32_t emu_reg_id, psp_gpr_t native_reg)
+      {
+         mapping[native_reg] = emu_reg_id;
+         usage_tag[native_reg] = next_usage_tag ++;
+         dirty[native_reg] = false;
+         weak[native_reg] = false;
+      }
+
       void get(uint32_t reg_count, int32_t* emu_reg_ids)
       {
          assert(reg_count < 5);
@@ -249,18 +269,40 @@ class register_manager
          weak[native_reg] = false;
       }
 
-      void flush(psp_gpr_t native_reg)
+      void flush(psp_gpr_t native_reg, bool keep_dirty = false, bool force = false)
       {
-         if (dirty[native_reg] && !weak[native_reg])
+         if ((dirty[native_reg] || force) && !weak[native_reg])
          {
             write_emu(native_reg, mapping[native_reg]);
-            dirty[native_reg] = false;
+            dirty[native_reg] = keep_dirty;
+            if (!keep_dirty)
+            {
+               mapping[native_reg] = 0xFF;
+               usage_tag[native_reg] = 0;
+            }
          }
       }
 
+      void flush_nds(uint32_t emu_reg_id)
+      {
+         for (int i = psp_s0; i < psp_s4; i ++)
+         {
+            if (mapping[i] == emu_reg_id)
+            {
+               flush((psp_gpr_t)i, false, true);
+            }
+         }
+      }
+
+      void set_dirty(psp_gpr_t native_reg, bool _dirty)
+      {
+         dirty[native_reg] = _dirty;
+      }
+
+
       void flush_all()
       {
-         for (int i = psp_s0; i != psp_s5; i ++)
+         for (int i = psp_s0; i < psp_s4; i ++)
          {
             //if (is_usable(i))
             {

@@ -318,7 +318,7 @@ int main(int argc, char **argv) {
   extern void test_jit_func();
   test_jit_func();
 
-  EMU_SCREEN();
+  EMU_SCREEN(false, false);
 
   printf("Ram: %d\n", RAMAMOUNT());
 
@@ -334,18 +334,25 @@ int main(int argc, char **argv) {
     NDS_exec<false>();
 
     u32 curr_timing = sceKernelGetSystemTimeLow();
+    fps_frame_counter += 1 + my_config.frameskip;
 
-    fps_frame_counter += 1 + my_config.frameskip;   
+    if (my_config.fps_cap) {
+        // Calcolo del tempo target per il frame attuale
+        u32 frame_time = 1000000 / TARGET_FPS;  // Tempo per frame in microsecondi
+        u32 target_timing = fps_base_tick + fps_frame_counter * frame_time;
+        int delay = target_timing - curr_timing;
 
-    if (my_config.fps_cap)
-    {
-        int delay =  (fps_base_tick + fps_frame_counter*1000000/TARGET_FPS) - curr_timing;
-
-        if (delay < -500000 || delay > 100000)
-          fps_base_tick = sceKernelGetSystemTimeLow();
-        else if (delay > 0)
-          sceKernelDelayThread(delay);
+        // Se il ritardo è troppo grande o troppo piccolo, resettare il timing di base
+        if (delay < -2000  || delay > 50000 ) {
+            fps_base_tick = curr_timing;
+            fps_frame_counter = 0;  // Resetta il contatore dei frame
+        }
+        // Applica un ritardo se necessario
+        else if (delay > 0) {
+            sceKernelDelayThread(delay);
+        }
     }
+
 
     if(curr_timing - last_fps_timing >= 1000000)
     {
