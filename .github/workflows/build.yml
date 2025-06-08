@@ -1,0 +1,27 @@
+name: Build DesmumePSP
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build with ticky/pspdev Docker image
+        run: |
+          # Execute make in the /src/build directory within the container
+          docker run --rm -v "$PWD:/src" ticky/pspdev make -C /src/build
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: psp-homebrew
+          path: |
+            build/EBOOT.PBP
+            build/*.prx
+            build/*.elf
