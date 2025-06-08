@@ -95,7 +95,7 @@ PSPDEV = $(shell psp-config -d)
 
 CFLAGS = -O3 -DNOPRINTF -finline-functions -fno-rtti -ffast-math -fweb   -G0 -Wall -D PSP -D NOSSE2 -D HAVE_LIBZ -funsigned-char -Wall \
                   -fstrict-aliasing -falign-functions \
-                  -falign-loops -falign-labels -falign-jumps -D HAVE_JIT \
+                  -falign-loops -falign-labels -falign-jumps -faligned-new -D HAVE_JIT \
                   -fcall-saved-s0 -fcall-saved-s1 -fcall-saved-s2 -fcall-saved-s3 -fcall-saved-s4 
 
 

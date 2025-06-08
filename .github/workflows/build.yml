@@ -12,10 +12,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build with ticky/pspdev Docker image
+      - name: Build with pspdev/pspdev Docker image
         run: |
           # Execute make in the /src/build directory within the container
-          docker run --rm -v "$PWD:/src" ticky/pspdev make -C /src/build
+          docker run --rm -v "$PWD:/src" pspdev/pspdev:latest make -C /src/build
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4

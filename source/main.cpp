@@ -235,13 +235,14 @@ void EMU_Conf(){
   PrintfXY("ROM: ", 0, 1);
   PrintfXY(gameInfo.ROMname, 5, 1);
 
-  char number;
-  sprintf(&number, "%1d", my_config.frameskip);
+  char number[4];
+  snprintf(number, sizeof(number), "%d", my_config.frameskip);
   PrintfXY("Frameskip: ", 55, 1);
-  PrintfXY(&number, 65, 1);
+  PrintfXY(number, 65, 1);
 }
 
 void ChangeRom(bool reset){
+  vdDejaLog("Beginning ChangeRom");
 
   if (reset){
     NDS_Reset();
@@ -257,6 +258,8 @@ void ChangeRom(bool reset){
 
   DSEmuGui("",rom_filename);
   pspDebugScreenClear();
+
+  vdDejaLog(rom_filename);
 
   int error = NDS_LoadROM(rom_filename);
 
@@ -299,21 +302,43 @@ int main(int argc, char **argv) {
 
   pspDebugScreenInitEx((void*)(0x44000000), PSP_DISPLAY_PIXEL_FORMAT_5551, 1);
 
+  PrintfXY("Initializing Framebuffer...", 0, 0);
+  sceKernelDelayThread(100000);
 
   Init_PSP_DISPLAY_FRAMEBUFF();
+
+  PrintfXY("Initializing NDS core...", 0, 1);
+  sceKernelDelayThread(100000);
 
   NDS_Init();
 
   /* default the firmware settings, they may get changed later */
+
+  PrintfXY("Initializing firmware settings...", 0, 2);
+  sceKernelDelayThread(100000);
+
   NDS_FillDefaultFirmwareConfigData(&fw_config);
+
+  PrintfXY(".", 0, 3);
+  sceKernelDelayThread(100000);
 
   slot2_Init();
 
+  PrintfXY(".", 1, 3);
+  sceKernelDelayThread(100000);
+
   slot2_Change(NDS_SLOT2_NONE);
+
+  PrintfXY(".", 2, 3);
+  sceKernelDelayThread(100000);
 
   /* Create the dummy firmware */
   NDS_CreateDummyFirmware( &fw_config);
 
+  PrintfXY(".", 3, 3);
+  sceKernelDelayThread(100000);
+
+  /*
   #ifdef PROFILE
     execute = true;
     NDS_LoadROM("test.nds");
@@ -323,6 +348,17 @@ int main(int argc, char **argv) {
     ChangeRom(false);
     EMU_Conf();
   #endif
+  */
+
+  ChangeRom(false);
+
+  PrintfXY(".", 3, 3);
+  sceKernelDelayThread(100000);
+
+  EMU_Conf();
+
+  PrintfXY("Preparing to display content...", 0, 4);
+  sceKernelDelayThread(100000);
 
   EMU_SCREEN();
 
