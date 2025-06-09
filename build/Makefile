@@ -8,6 +8,7 @@ SRCDIR = ../source
 OBJS = $(SRCDIR)/arm_instructions.o \
 $(SRCDIR)/arm_jit.o \
 $(SRCDIR)/armcpu.o \
+$(SRCDIR)/arm7_hle.o \
 $(SRCDIR)/bios.o \
 $(SRCDIR)/blockdecoder.o \
 $(SRCDIR)/common.o \
@@ -20,6 +21,7 @@ $(SRCDIR)/FIFO.o \
 $(SRCDIR)/firmware.o \
 $(SRCDIR)/gfx3d.o \
 $(SRCDIR)/GPU.o \
+$(SRCDIR)/main.o \
 $(SRCDIR)/matrix.o \
 $(SRCDIR)/mc.o \
 $(SRCDIR)/mic.o \

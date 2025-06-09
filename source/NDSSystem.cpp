@@ -1774,7 +1774,6 @@ void NDS_exec(s32 nb)
 		u32 arm9arm7 = armInnerLoop<true,true,true>(nds_timer_base,s32next,arm9,arm7);
 
 		ARM7_SKIP_HACK = nds.hw_status.VCount < 180 || (my_config.extrmarm7down && nds.hw_status.VCount > 230);
-		//ARM7_SKIP_HACK = (nds.hw_status.VCount > 230 && ipc_fifo[ARM7].size > 0) || nds.hw_status.VCount < 185;
 
 		ARM9_SKIP_HACK = nds.hw_status.VCount > 250;
 

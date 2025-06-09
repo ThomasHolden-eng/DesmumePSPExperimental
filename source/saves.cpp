@@ -255,14 +255,14 @@ SFORMAT SF_MMU[]={
 	//{ "MCHD", 4, 1,       &MMU.CheckDMAs},
 
 	//fifos
-	{ "F0TH", 1, 1,       &ipc_fifo[0].head},
-	{ "F0TL", 1, 1,       &ipc_fifo[0].tail},
-	{ "F0SZ", 1, 1,       &ipc_fifo[0].size},
-	{ "F0BF", 4, 16,      ipc_fifo[0].buf},
-	{ "F1TH", 1, 1,       &ipc_fifo[1].head},
-	{ "F1TL", 1, 1,       &ipc_fifo[1].tail},
-	{ "F1SZ", 1, 1,       &ipc_fifo[1].size},
-	{ "F1BF", 4, 16,      ipc_fifo[1].buf},
+	{ "F0TH", 1, 1,       &IPCFIFO9.ReadPos},
+	{ "F0TL", 1, 1,       &IPCFIFO9.WritePos},
+	{ "F0SZ", 1, 1,       &IPCFIFO9.NumOccupied},
+	{ "F0BF", 4, 16,      IPCFIFO9.Entries},
+	{ "F1TH", 1, 1,       &IPCFIFO7.ReadPos},
+	{ "F1TL", 1, 1,       &IPCFIFO7.WritePos},
+	{ "F1SZ", 1, 1,       &IPCFIFO7.NumOccupied},
+	{ "F1BF", 4, 16,      IPCFIFO7.Entries},
 
 	{ "FDHD", 4, 1,       &disp_fifo.head},
 	{ "FDTL", 4, 1,       &disp_fifo.tail},

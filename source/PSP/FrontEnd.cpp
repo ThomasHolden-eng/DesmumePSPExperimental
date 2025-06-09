@@ -19,6 +19,8 @@
 #include "PSPDisplay.h"
 //#include "Version.h"
 
+void vdDejaLog(char *msg);
+
 configP configparms[30];
 int totalconfig=0;
 int totalconfigDebug=0;
@@ -565,15 +567,20 @@ void DSEmuGui(char *path,char *out)
 	char app_path[128];
 
 	SceCtrlData pad,oldPad;
-	
+
+	vdDejaLog("Before ClearFileList");
 	ClearFileList();
 
+	vdDejaLog("Before getcwd");
 	getcwd(app_path,128);
 
+	vdDejaLog("Before sprintf");
 	sprintf(tmp,"%s/ROMS/",app_path);
 
+	vdDejaLog("Before GetFileList");
 	GetFileList(tmp);
 
+	vdDejaLog("During Block");
 	while(1){
 		sceDisplayWaitVblankStart();
 		pspDebugScreenSetXY(0, 3);

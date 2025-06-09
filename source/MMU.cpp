@@ -1617,6 +1617,52 @@ static void CalculateTouchPressure(int pressurePercent, u16 &z1, u16& z2)
 
 }
 
+u8 pwm_val = 0;
+
+u8 MMU_readPowerMan()
+{
+	return pwm_val;
+}
+
+void MMU_writePowerMan(u8 val, bool hold){
+
+	if (!hold)
+    {
+        MMU.powerMan_CntRegWritten = FALSE;
+    }
+
+	if (hold && (!MMU.powerMan_CntRegWritten))
+	{
+		MMU.powerMan_CntReg = val;
+		MMU.powerMan_CntRegWritten = TRUE;
+		pwm_val = 0;
+	}
+	else
+	{
+		// TODO: DSi-specific registers in DSi mode
+        u32 regid = MMU.powerMan_CntReg & 0x07;
+
+		//(let's start with emulating a DS lite, since it is the more complex case)
+		if(MMU.powerMan_CntReg & 0x80)
+		{
+			//read
+			pwm_val = MMU.powerMan_Reg[regid];
+		}
+		else
+		{
+
+			const u8 RegMasks[8] = {0x7f, 0x00, 0x01, 0x03, 0x0f, 0x00, 0x00, 0x00};
+			//write
+			MMU.powerMan_Reg[regid] = (MMU.powerMan_Reg[regid] & ~RegMasks[regid]) | (val & RegMasks[regid]);
+
+		}
+
+		MMU.powerMan_CntRegWritten = FALSE;
+	}
+	
+	//T1WriteWord(MMU.MMU_MEM[ARMCPU_ARM7][(REG_SPIDATA >> 20) & 0xff], REG_SPIDATA & 0xfff, ret & 0x00FF);
+}
+
 void FASTCALL MMU_writeToSPIData(u16 val)
 {
 
