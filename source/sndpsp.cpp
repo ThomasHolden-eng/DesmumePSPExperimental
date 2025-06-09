@@ -65,8 +65,8 @@ SNDPSPUnMuteAudio,
 SNDPSPSetVolume
 };
 
-void MixAudio(void * stream, u32 len, void *userdata) {
-    int i;
+void MixAudio(void * stream, unsigned int len, void *userdata) {
+    unsigned int i;
     u8* soundbuf = (u8*)stereodata16;
     u8* ubuf = (u8*) stream;
 
