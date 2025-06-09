@@ -225,13 +225,15 @@ void EMU_Conf(){
   PrintfXY("ROM: ", 0, 1);
   PrintfXY(gameInfo.ROMname, 5, 1);
 
-  char number;
-  sprintf(&number, "%1d", my_config.frameskip);
+  char number[4];
+  snprintf(number, sizeof(number), "%d", my_config.frameskip);
   PrintfXY("Frameskip: ", 55, 1);
-  PrintfXY(&number, 65, 1);
+  PrintfXY(number, 65, 1);
 }
 
 void ChangeRom(bool reset){
+
+  vdDejaLog("Beginning ChangeRom");
 
   if (reset){
     NDS_Reset();
@@ -247,6 +249,8 @@ void ChangeRom(bool reset){
 
   DSEmuGui("",rom_filename);
   pspDebugScreenClear();
+
+  vdDejaLog(rom_filename);
 
   int error = NDS_LoadROM(rom_filename);
 
@@ -286,22 +290,29 @@ int main(int argc, char **argv) {
 
   scePowerSetClockFrequency(333, 333, 166);
 
+  PrintfXY(".", 0, 0);
   _DisableFPUExceptions();
 
+  PrintfXY(".", 1, 0);
   pspDebugScreenInitEx((void*)(0x44000000), PSP_DISPLAY_PIXEL_FORMAT_5551, 1);
 
-
+  PrintfXY(".", 2, 0);
   Init_PSP_DISPLAY_FRAMEBUFF();
 
+  PrintfXY(".", 3, 0);
   NDS_Init();
 
+  PrintfXY(".", 4, 0);
   /* default the firmware settings, they may get changed later */
   NDS_FillDefaultFirmwareConfigData(&fw_config);
 
+  PrintfXY(".", 5, 0);
   slot2_Init();
 
+  PrintfXY(".", 6, 0);
   slot2_Change(NDS_SLOT2_NONE);
 
+  PrintfXY(".", 7, 0);
   /* Create the dummy firmware */
   NDS_CreateDummyFirmware( &fw_config);
 
@@ -315,11 +326,14 @@ int main(int argc, char **argv) {
     EMU_Conf();
   #endif
 
+  PrintfXY(".", 8, 0);
   extern void test_jit_func();
   test_jit_func();
 
+  PrintfXY(".", 9, 0);
   EMU_SCREEN(false, false);
 
+  PrintfXY(".", 10, 0);
   printf("Ram: %d\n", RAMAMOUNT());
 
   while(execute)
