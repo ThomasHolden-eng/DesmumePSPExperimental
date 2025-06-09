@@ -45,6 +45,8 @@
 #include "me.h"
 #include <pspaudiocodec.h>
 
+#include "arm7_hle.h"
+
 #ifdef FASTBUILD
 	#undef FORCEINLINE
 	#define FORCEINLINE
@@ -602,7 +604,11 @@ FORCEINLINE FASTCALL void GPU::_master_setFinal3dColor(int dstX, int srcX)
 	u8 alpha = color[3];
 	u8* dst = currDst;
 
-	u32 final = RGB15(red,green,blue,alpha);
+	if (red == 0xfa && green == 0xfa && blue == 0xfa) {
+		return; //transparent, I hope none of the games use this color
+	}
+
+	u32 final = RGB15(0,0,0,1);
 	
 	HostWriteWord(dst, passing, final);
 	bgPixels[x] = 0;
@@ -1867,9 +1873,9 @@ int Screen_Init()
 
 	disp_fifo.head = disp_fifo.tail = 0;
 
-	if (!IsEmu()){
+	/*if (!IsEmu()){
 		sceAudiocodecGetEDRAM((long unsigned int*)ME_GPU_Screen, 0x1002);
-	}else{
+	}else*/{
 		ME_GPU_Screen = GPU_Screen;
 
 		volatile u8 * buff = ME_GPU_Screen;
@@ -1879,6 +1885,7 @@ int Screen_Init()
 			*(buff++) = 0x7FFF;
 	}
 
+	printf("GPU_Screen: %08X\n", (u32)ME_GPU_Screen);
 	/*if (osd)  {delete osd; osd =NULL; }
 	osd  = new OSDCLASS(-1);*/
 
@@ -1887,20 +1894,15 @@ int Screen_Init()
 
 void Screen_Reset(void)
 {
-	printf("1\n");
 	GPU_Reset(MainScreen.gpu, 0);
 	GPU_Reset(SubScreen.gpu, 1);
-	printf("1\n");
 	MainScreen.offset = 0;
 	SubScreen.offset = 256;
 
-	volatile u8* buff = GPU_Screen;
+	volatile u8* buff = ME_GPU_Screen;
 
-	printf("1\n");
 
 	memset((void*)GPU_Screen, 0x7FFF, sizeof(GPU_Screen));
-
-	printf("1\n");
 
 
 	//fast_memset((void*)&_screen[0], 0, sizeof(_screen));
@@ -2096,12 +2098,12 @@ PLAIN_CLEAR:
 								gpu->currBgNum = 0;
 								
 								//comment this if using GU 3D
-								gfx3d_GetLineData(l, &gpu->_3dColorLine);
+								/*gfx3d_GetLineData(l, &gpu->_3dColorLine);
 								u8* colorLine = gpu->_3dColorLine;
 
 								for(int k = 256; --k;)
 									if(colorLine[psp_addrScreen3DLine[k]])
-										gpu->setFinalColor3d(k, k);
+										gpu->setFinalColor3d(k, k);*/
 							
 								continue;
 							}
@@ -2325,9 +2327,8 @@ template<bool SKIP> static void GPU_RenderLine_DispCapture(u16 l)
 
 int sub_index = 0;
 
-static INLINE void GPU_RenderLine_MasterBrightness(volatile NDS_Screen * screen, u16 l)
+static INLINE void GPU_RenderLine_MasterBrightness(GPU * gpu, u16 l)
 {
-	GPU * gpu = screen->gpu;
 
 	u8* dst = gpu->currDst;//GetFrameBuffer() + (l*1024) + sub_index;
 	u16 i16;
@@ -2458,23 +2459,16 @@ void GPU::update_winh(int WIN_NUM)
 	//{
 	//	if((x < startX) || (x >= endX)) return false;
 	//}
-
+	
 	if(startX > endX)
 	{
-		for(int i=0;i<=endX;++i)
-			h_win[WIN_NUM][i] = 1;
-		for(int i=endX+1;i<startX;++i)
-			h_win[WIN_NUM][i] = 0;
-		for(int i=startX;i<256;++i)
-			h_win[WIN_NUM][i] = 1;
-	} else
+		memset(h_win[WIN_NUM], 1, 256 * sizeof(u8));
+		memset(h_win[WIN_NUM] + endX + 1, 0, (startX - (endX + 1)) * sizeof(u8));
+	}
+	else
 	{
-		for(int i=0;i<startX;++i)
-			h_win[WIN_NUM][i] = 0;
-		for(int i=startX;i<endX;++i)
-			h_win[WIN_NUM][i] = 1;
-		for(int i=endX;i<256;++i)
-			h_win[WIN_NUM][i] = 0;
+		memset(h_win[WIN_NUM], 0, 256 * sizeof(u8));
+		memset(h_win[WIN_NUM] + startX, 1, (endX - startX) * sizeof(u8));
 	}
 }
 
@@ -2486,7 +2480,10 @@ void GPU_RenderLine(volatile NDS_Screen * screen, u16 l, bool skip)
 {
 	GPU * gpu = screen->gpu;
 
+
 	sub_index = screen->offset;
+
+	
 
 	if (my_config.swap) 
 		if (sub_index == 0) sub_index = 512;
@@ -2552,7 +2549,7 @@ void GPU_RenderLine(volatile NDS_Screen * screen, u16 l, bool skip)
 		if(!(gpu->core == GPU_MAIN && (gpu->dispCapCnt.enabled || l == 0 || l == 191)))
 		{
 			gpu->currLine = l;
-			GPU_RenderLine_MasterBrightness(screen, l);
+			//GPU_RenderLine_MasterBrightness(gpu, l);
 			return;
 		}
 	}
@@ -2645,24 +2642,20 @@ void GPU_RenderLine(volatile NDS_Screen * screen, u16 l, bool skip)
 				u8* framebuf = (u8*)(ME_GPU_Screen + 512)+psp_addrScreenLine[mouse.y +yy];//(u8*)(screen->gpu->currDst) /*+ (mouse.y) * 1024)*/; //GetFrameBuffer() + ((yy + y) * 1024);
 				for (unsigned int xx = 0; xx < 8; xx++)
 				{
-					*(framebuf + (X + xx)) = ~((*(framebuf + (X + xx)))>>1);
+					*(framebuf + (X + xx)) ^= ((*(framebuf + (X + xx)))>>1);
 				}
 			}
 		}
 
 
-	if (l == 191) {
+	/*if (l == 191) {
 		memcpy((void*)&GPU_Screen[(gpu->core == GPU_MAIN) ? 0 : 192 * 256 * 2], (void*)&ME_GPU_Screen[(gpu->core == GPU_MAIN) ? 0 : 192 * 256 * 2], 192 * 256 * 2);
-	}
-	GPU_RenderLine_MasterBrightness(screen, l);
+	}*/
+	//GPU_RenderLine_MasterBrightness(screen, l);
 
 	
 }
 
-void GPU_RenderGU(NDS_Screen* screen, u16 l, bool skip)
-{
-	
-}
 
 void gpu_savestate(EMUFILE* os)
 {
