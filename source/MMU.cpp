@@ -51,6 +51,8 @@
 #include <pspsuspend.h>
 #include "PSP/pspvfpu.h"
 
+#include "arm7_hle.h"
+
 //HCF: To allocate volatile memory
 /*
 void* HCF_RAM_ARRAY;
@@ -2110,8 +2112,11 @@ static INLINE void MMU_IPCSync(u8 proc, u32 val)
 	T1WriteLong(MMU.MMU_MEM[proc^1][0x40], 0x180, sync_r);
 
 	if ((sync_l & IPCSYNC_IRQ_SEND) && (sync_r & IPCSYNC_IRQ_RECV))
+	{
 		NDS_makeIrq(proc^1, IRQ_BIT_IPCSYNC);
-
+	}
+	
+	HLE_IPCSYNC();
 	NDS_Reschedule();
 }
 

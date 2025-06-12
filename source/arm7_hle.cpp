@@ -27,6 +27,29 @@ u16 Mic_Data[16];
 
 int Sound_Engine;
 
+void HLE_Reset(){
+    IPCSync9 = 0;
+    IPCSync7 = 0;
+    IPCFIFOCnt9 = 0;
+    IPCFIFOCnt7 = 0;
+    SM_Command = 0;
+    SM_DataPos = 0;
+    SM_Buffer = 0;
+
+    Sound_Engine = -1;
+
+    memset(PM_Data, 0, sizeof(PM_Data));
+
+    memset(Mic_Data, 0, sizeof(Mic_Data));
+
+    TS_Status = 0;
+    memset(TS_Data, 0, sizeof(TS_Data));
+    TS_NumSamples = 0;
+    memset(TS_SamplePos, 0, sizeof(TS_SamplePos));
+
+    memset(FW_Data, 0, sizeof(FW_Data));
+}
+
 void SendIPCSync(u8 val)
 {
     IPCSync9 = (IPCSync9 & 0xFFF0) | (val & 0xF);
@@ -48,6 +71,19 @@ void SendIPCReply(u32 service, u32 data, u32 flag)
             NDS_makeIrq(0, IRQ_BIT_IPCFIFO_RECVNONEMPTY);
         
         NDS_Reschedule();
+    }
+}
+
+void StartScanline(u32 line)
+{
+    for (int i = 0; i < TS_NumSamples; i++)
+    {
+        if (line == TS_SamplePos[i])
+        {
+            Touchscreen_Sample();
+            SendIPCReply(0x6, 0x03009000 | i);
+            break;
+        }
     }
 }
 
@@ -651,5 +687,29 @@ void OnIPCRequest()
     default:
         printf("HLE: unknown IPC request %08X service=%02X data=%08X flag=%d\n", val, service, data, flag);
         break;
+    }
+}
+
+void executeARM7Stuff(){
+    extern u16 get_keypad();
+	_MMU_write16<ARMCPU_ARM7>(0x027FFFA8, get_keypad());
+    //Sound_Nitro::Process(1);
+}
+
+void HLE_IPCSYNC(){
+    //printf("HLE: IPCSYNC %d\n", val);
+
+    u8 val = IPCSync7 & 0xF;
+    
+    if (val < 5)
+    {
+        SendIPCSync(val+1);
+    }
+    else if (val == 5)
+    {
+        SendIPCSync(0);
+
+        // presumably ARM7-side ready flags for each IPC service
+        _MMU_write32<ARMCPU_ARM7>(0x027FFF8C, 0x0000FFF0);
     }
 }

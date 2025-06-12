@@ -61,6 +61,8 @@
 #include "melib.h"
 #include "me.h"
 
+#include "arm7_hle.h"
+
 
 bool dolog = false;
 //===============================================================
@@ -1474,6 +1476,11 @@ static void execHardware_hstart()
 	
 	triggerDma(EDMAMode_HStart);
 
+	//used by the hle
+	if(nds.hw_status.VCount<193) 
+	{
+		StartScanline(nds.hw_status.VCount-1);
+	}
 	if(nds.hw_status.VCount<192)
 	{
 		//this is hacky.
@@ -1798,6 +1805,8 @@ void NDS_exec(s32 nb)
 			nds_arm7_timer = nds_timer;
 		}
 	}
+
+	executeARM7Stuff();
 
 	if (PSP_UC(RenderDone)){
 		PSP_UC(Do2dRender) = true;
@@ -2211,6 +2220,8 @@ void NDS_Reset()
 	if(!IsEmu()) J_EXECUTE_ME_ONCE(&renderScreen, (int)frameSkipper.ShouldSkip2D());
 
 	resetUserInput();
+
+	HLE_Reset();
 	
 	nds.hw_status.val = 0;
 	nds.freezeBus = 0;
