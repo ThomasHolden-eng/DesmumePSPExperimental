@@ -27,6 +27,27 @@ u16 Mic_Data[16];
 
 int Sound_Engine;
 
+void Touchscreen_Sample()
+{
+    u32 ts = _MMU_read16<ARMCPU_ARM7>(0x027FFFAA) | (_MMU_read16<ARMCPU_ARM7>(0x027FFFAC) << 16);
+    
+    if (nds.scr_touchY == 0xFFF)
+    {
+        ts &= 0xFE000000;
+        ts |= 0x06000000;
+    }
+    else
+    {
+        ts &= 0xF9000000;
+        ts |= (nds.scr_touchX & 0xFFF);
+        ts |= ((nds.scr_touchY & 0xFFF) << 12);
+        ts |= 0x01000000;
+    }
+
+    _MMU_write16<ARMCPU_ARM7>(0x027FFFAA, ts & 0xFFFF);
+    _MMU_write16<ARMCPU_ARM7>(0x027FFFAC, ts >> 16);
+}
+
 void HLE_Reset(){
     IPCSync9 = 0;
     IPCSync7 = 0;
@@ -177,27 +198,6 @@ void OnIPCRequest_Cart(u32 data)
 
         SendIPCReply(0xD, 0x1);
     }*/
-}
-
-void Touchscreen_Sample()
-{
-    u32 ts = _MMU_read16<ARMCPU_ARM7>(0x027FFFAA) | (_MMU_read16<ARMCPU_ARM7>(0x027FFFAC) << 16);
-    
-    if (nds.scr_touchY == 0xFFF)
-    {
-        ts &= 0xFE000000;
-        ts |= 0x06000000;
-    }
-    else
-    {
-        ts &= 0xF9000000;
-        ts |= (nds.scr_touchX & 0xFFF);
-        ts |= ((nds.scr_touchY & 0xFFF) << 12);
-        ts |= 0x01000000;
-    }
-
-    _MMU_write16<ARMCPU_ARM7>(0x027FFFAA, ts & 0xFFFF);
-    _MMU_write16<ARMCPU_ARM7>(0x027FFFAC, ts >> 16);
 }
 
 void OnIPCRequest_Touchscreen(u32 data)
