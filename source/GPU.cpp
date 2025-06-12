@@ -2651,7 +2651,7 @@ void GPU_RenderLine(volatile NDS_Screen * screen, u16 l, bool skip)
 	/*if (l == 191) {
 		memcpy((void*)&GPU_Screen[(gpu->core == GPU_MAIN) ? 0 : 192 * 256 * 2], (void*)&ME_GPU_Screen[(gpu->core == GPU_MAIN) ? 0 : 192 * 256 * 2], 192 * 256 * 2);
 	}*/
-	GPU_RenderLine_MasterBrightness(screen, l);
+	GPU_RenderLine_MasterBrightness(gpu, l);
 
 	
 }
