@@ -604,11 +604,11 @@ FORCEINLINE FASTCALL void GPU::_master_setFinal3dColor(int dstX, int srcX)
 	u8 alpha = color[3];
 	u8* dst = currDst;
 
-	if (red == 0xfa && green == 0xfa && blue == 0xfa) {
+	if (alpha == 0) {
 		return; //transparent, I hope none of the games use this color
 	}
 
-	u32 final = RGB15(0,0,0,1);
+	u32 final = RGB15(red,green,blue,1);
 	
 	HostWriteWord(dst, passing, final);
 	bgPixels[x] = 0;
@@ -2098,12 +2098,12 @@ PLAIN_CLEAR:
 								gpu->currBgNum = 0;
 								
 								//comment this if using GU 3D
-								/*gfx3d_GetLineData(l, &gpu->_3dColorLine);
+								gfx3d_GetLineData(l, &gpu->_3dColorLine);
 								u8* colorLine = gpu->_3dColorLine;
 
 								for(int k = 256; --k;)
 									if(colorLine[psp_addrScreen3DLine[k]])
-										gpu->setFinalColor3d(k, k);*/
+										gpu->setFinalColor3d(k, k);
 							
 								continue;
 							}
@@ -2549,7 +2549,7 @@ void GPU_RenderLine(volatile NDS_Screen * screen, u16 l, bool skip)
 		if(!(gpu->core == GPU_MAIN && (gpu->dispCapCnt.enabled || l == 0 || l == 191)))
 		{
 			gpu->currLine = l;
-			//GPU_RenderLine_MasterBrightness(gpu, l);
+			GPU_RenderLine_MasterBrightness(gpu, l);
 			return;
 		}
 	}
@@ -2651,7 +2651,7 @@ void GPU_RenderLine(volatile NDS_Screen * screen, u16 l, bool skip)
 	/*if (l == 191) {
 		memcpy((void*)&GPU_Screen[(gpu->core == GPU_MAIN) ? 0 : 192 * 256 * 2], (void*)&ME_GPU_Screen[(gpu->core == GPU_MAIN) ? 0 : 192 * 256 * 2], 192 * 256 * 2);
 	}*/
-	//GPU_RenderLine_MasterBrightness(screen, l);
+	GPU_RenderLine_MasterBrightness(screen, l);
 
 	
 }
